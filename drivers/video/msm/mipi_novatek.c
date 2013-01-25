@@ -119,6 +119,7 @@ static char led_pwm3[] =
 	0x55, 0x00,
 };
 static unsigned char bkl_enable_cmds[] = {0x53, 0x24};/* DTYPE_DCS_WRITE1 */ /* bkl on and no dim */
+static unsigned char bkl_enable_dimming_cmds[] = {0x53, 0x2c};/* DTYPE_DCS_WRITE1 */ /* bkl on and dim */
 static unsigned char bkl_disable_cmds[] = {0x53, 0x00};/* DTYPE_DCS_WRITE1 */ /* bkl off */
 
 #ifdef NOVETAK_COMMANDS_UNUSED
@@ -1958,6 +1959,11 @@ static struct dsi_cmd_desc novatek_bkl_enable_cmds[] = {
 		sizeof(bkl_enable_cmds), bkl_enable_cmds},
 };
 
+static struct dsi_cmd_desc novatek_bkl_enable_dimming_cmds[] = {
+	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
+		sizeof(bkl_enable_dimming_cmds), bkl_enable_dimming_cmds},
+};
+
 static struct dsi_cmd_desc novatek_bkl_disable_cmds[] = {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 0,
 		sizeof(bkl_disable_cmds), bkl_disable_cmds},
@@ -2151,13 +2157,25 @@ static int mipi_dsi_set_backlight(struct msm_fb_data_type *mfd)
 	}
 	if (mipi->mode == DSI_VIDEO_MODE) {
 		mipi_dsi_cmd_mode_ctrl(1);	/* enable cmd mode */
+                if (mfd->bl_level == 0)
+                        mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_bkl_enable_cmds,
+                                ARRAY_SIZE(novatek_bkl_enable_cmds));
 		mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_cmd_backlight_cmds,
-			ARRAY_SIZE(novatek_cmd_backlight_cmds));
+		ARRAY_SIZE(novatek_cmd_backlight_cmds));
+                if (bl_level_old == 0 && mfd->bl_level != 0)
+                        mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_bkl_enable_dimming_cmds,
+                                ARRAY_SIZE(novatek_bkl_enable_dimming_cmds));
 		mipi_dsi_cmd_mode_ctrl(0);	/* disable cmd mode */
 	} else {
 		mipi_dsi_op_mode_config(DSI_CMD_MODE);
+		if (mfd->bl_level == 0)
+			mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_bkl_enable_cmds,
+				ARRAY_SIZE(novatek_bkl_enable_cmds));
 		mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_cmd_backlight_cmds,
-			ARRAY_SIZE(novatek_cmd_backlight_cmds));
+		ARRAY_SIZE(novatek_cmd_backlight_cmds));
+		if (bl_level_old == 0 && mfd->bl_level != 0)
+			mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_bkl_enable_dimming_cmds,
+				ARRAY_SIZE(novatek_bkl_enable_dimming_cmds));
 	}
 	bl_level_prevset = bl_level_old = mfd->bl_level;
 end:
@@ -2168,18 +2186,8 @@ end:
 static void mipi_novatek_set_backlight(struct msm_fb_data_type *mfd)
 {
 	int bl_level;
-	static int init_3d_backlight = 0;
-	bl_level = mfd->bl_level;
 
-#if defined(CONFIG_MACH_SHOOTER) || defined(CONFIG_MACH_SHOOTER_U)
-	if (atomic_read(&g_3D_mode) != 0) {
-		if (init_3d_backlight == 1)
-			return;
-		else
-			init_3d_backlight = 1;
-	} else
-#endif
-		init_3d_backlight = 0;
+	bl_level = mfd->bl_level;
 
 	mipi_dsi_set_backlight(mfd);
 }

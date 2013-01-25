@@ -803,7 +803,7 @@ static int mipi_dsi_on(struct platform_device *pdev)
 
 	mipi  = &mfd->panel_info.mipi;
 	mipi_dsi_host_init(mipi);
-
+	mdelay(10);
 	/* workaround for orise driver ic to exit ULP mode */
 	if (bfirsttime) {
 		if ((panel_type == PANEL_ID_SHR_SHARP_OTM_C2) ||

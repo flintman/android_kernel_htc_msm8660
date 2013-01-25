@@ -19,7 +19,7 @@
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/anon_inodes.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 #include <linux/list.h>
 #include <linux/miscdevice.h>
 #include <linux/mm.h>
@@ -421,8 +421,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		if (!((1 << heap->id) & flags))
 			continue;
 		/* Do not allow un-secure heap if secure is specified */
-		if (secure_allocation &&
-			(heap->type != (enum ion_heap_type) ION_HEAP_TYPE_CP))
+		if (secure_allocation && (heap->type != ION_HEAP_TYPE_CP))
 			continue;
 		buffer = ion_buffer_create(heap, dev, len, align, flags);
 		if (!IS_ERR_OR_NULL(buffer))
@@ -969,7 +968,6 @@ out:
 
 }
 
-
 static const struct file_operations ion_share_fops;
 
 struct ion_handle *ion_import_fd(struct ion_client *client, int fd)
@@ -1238,6 +1236,180 @@ int ion_handle_get_size(struct ion_client *client, struct ion_handle *handle,
 	return 0;
 }
 EXPORT_SYMBOL(ion_handle_get_size);
+
+static int ion_share_release(struct inode *inode, struct file* file)
+{
+	struct ion_buffer *buffer = file->private_data;
+
+	pr_debug("%s: %d\n", __func__, __LINE__);
+	/* drop the reference to the buffer -- this prevents the
+	   buffer from going away because the client holding it exited
+	   while it was being passed */
+	ion_buffer_put(buffer);
+	return 0;
+}
+
+static void ion_vma_open(struct vm_area_struct *vma)
+{
+
+	struct ion_buffer *buffer = vma->vm_file->private_data;
+	struct ion_handle *handle = vma->vm_private_data;
+	struct ion_client *client;
+
+	pr_debug("%s: %d\n", __func__, __LINE__);
+	/* check that the client still exists and take a reference so
+	   it can't go away until this vma is closed */
+	client = ion_client_lookup(buffer->dev, current->group_leader);
+	if (IS_ERR_OR_NULL(client)) {
+		vma->vm_private_data = NULL;
+		return;
+	}
+	ion_handle_get(handle);
+	mutex_lock(&buffer->lock);
+	buffer->umap_cnt++;
+	mutex_unlock(&buffer->lock);
+	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
+		 __func__, __LINE__,
+		 atomic_read(&client->ref.refcount),
+		 atomic_read(&handle->ref.refcount),
+		 atomic_read(&buffer->ref.refcount));
+}
+
+static void ion_vma_close(struct vm_area_struct *vma)
+{
+	struct ion_handle *handle = vma->vm_private_data;
+	struct ion_buffer *buffer = vma->vm_file->private_data;
+	struct ion_client *client;
+
+	pr_debug("%s: %d\n", __func__, __LINE__);
+	/* this indicates the client is gone, nothing to do here */
+	if (!handle)
+		return;
+	client = handle->client;
+	mutex_lock(&buffer->lock);
+	buffer->umap_cnt--;
+	mutex_unlock(&buffer->lock);
+
+	if (buffer->heap->ops->unmap_user)
+		buffer->heap->ops->unmap_user(buffer->heap, buffer);
+
+
+	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
+		 __func__, __LINE__,
+		 atomic_read(&client->ref.refcount),
+		 atomic_read(&handle->ref.refcount),
+		 atomic_read(&buffer->ref.refcount));
+	mutex_lock(&client->lock);
+	ion_handle_put(handle);
+	mutex_unlock(&client->lock);
+	ion_client_put(client);
+	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
+		 __func__, __LINE__,
+		 atomic_read(&client->ref.refcount),
+		 atomic_read(&handle->ref.refcount),
+		 atomic_read(&buffer->ref.refcount));
+}
+
+static struct vm_operations_struct ion_vm_ops = {
+	.open = ion_vma_open,
+	.close = ion_vma_close,
+};
+
+static int ion_share_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct ion_buffer *buffer = file->private_data;
+	unsigned long size = vma->vm_end - vma->vm_start;
+	struct ion_client *client;
+	struct ion_handle *handle;
+	int ret;
+	unsigned long flags = file->f_flags & O_DSYNC ?
+				ION_SET_CACHE(UNCACHED) :
+				ION_SET_CACHE(CACHED);
+
+
+	pr_debug("%s: %d\n", __func__, __LINE__);
+	/* make sure the client still exists, it's possible for the client to
+	   have gone away but the map/share fd still to be around, take
+	   a reference to it so it can't go away while this mapping exists */
+	client = ion_client_lookup(buffer->dev, current->group_leader);
+	if (IS_ERR_OR_NULL(client)) {
+		pr_err("%s: trying to mmap an ion handle in a process with no "
+		       "ion client\n", __func__);
+		return -EINVAL;
+	}
+
+	if ((size > buffer->size) || (size + (vma->vm_pgoff << PAGE_SHIFT) >
+				     buffer->size)) {
+		pr_err("%s: trying to map larger area than handle has available"
+		       "\n", __func__);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	/* find the handle and take a reference to it */
+	handle = ion_import(client, buffer);
+	if (IS_ERR_OR_NULL(handle)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (!handle->buffer->heap->ops->map_user) {
+		pr_err("%s: this heap does not define a method for mapping "
+		       "to userspace\n", __func__);
+		ret = -EINVAL;
+		goto err1;
+	}
+
+	mutex_lock(&buffer->lock);
+
+	if (ion_validate_buffer_flags(buffer, flags)) {
+		ret = -EEXIST;
+		mutex_unlock(&buffer->lock);
+		goto err1;
+	}
+
+	/* now map it to userspace */
+	ret = buffer->heap->ops->map_user(buffer->heap, buffer, vma,
+						flags);
+
+	buffer->umap_cnt++;
+	if (ret) {
+		pr_err("%s: failure mapping buffer to userspace\n",
+		       __func__);
+		goto err2;
+	}
+	mutex_unlock(&buffer->lock);
+
+	vma->vm_ops = &ion_vm_ops;
+	/* move the handle into the vm_private_data so we can access it from
+	   vma_open/close */
+	vma->vm_private_data = handle;
+	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
+		 __func__, __LINE__,
+		 atomic_read(&client->ref.refcount),
+		 atomic_read(&handle->ref.refcount),
+		 atomic_read(&buffer->ref.refcount));
+	return 0;
+
+err2:
+	buffer->umap_cnt--;
+	mutex_unlock(&buffer->lock);
+	/* drop the reference to the handle */
+err1:
+	mutex_lock(&client->lock);
+	ion_handle_put(handle);
+	mutex_unlock(&client->lock);
+err:
+	/* drop the reference to the client */
+	ion_client_put(client);
+	return ret;
+}
+
+static const struct file_operations ion_share_fops = {
+	.owner		= THIS_MODULE,
+	.release	= ion_share_release,
+	.mmap		= ion_share_mmap,
+};
 
 static int ion_ioctl_share(struct file *parent, struct ion_client *client,
 			   struct ion_handle *handle)

@@ -11,7 +11,7 @@
  *
  */
 #include <linux/err.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/memory_alloc.h>
@@ -299,5 +299,4 @@ static void __exit msm_ion_exit(void)
 
 subsys_initcall(msm_ion_init);
 module_exit(msm_ion_exit);
-
 

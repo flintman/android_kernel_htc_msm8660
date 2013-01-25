@@ -15,7 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/consumer.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 #include <mach/irqs.h>
 #include <mach/dma.h>
 #include <asm/mach/mmc.h>
@@ -764,7 +764,7 @@ static struct msm_bus_vectors grp3d_nominal_high_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_3D,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = KGSL_CONVERT_TO_MBPS(2008),
+		.ib = KGSL_CONVERT_TO_MBPS(2484),
 	},
 };
 
@@ -773,7 +773,7 @@ static struct msm_bus_vectors grp3d_max_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_3D,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = KGSL_CONVERT_TO_MBPS(2484),
+		.ib = KGSL_CONVERT_TO_MBPS(2976),
 	},
 };
 
@@ -820,7 +820,7 @@ static struct msm_bus_vectors grp2d0_max_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_2D_CORE0,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = KGSL_CONVERT_TO_MBPS(990),
+		.ib = KGSL_CONVERT_TO_MBPS(1300),
 	},
 };
 
@@ -855,7 +855,7 @@ static struct msm_bus_vectors grp2d1_max_vectors[] = {
 		.src = MSM_BUS_MASTER_GRAPHICS_2D_CORE1,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
 		.ab = 0,
-		.ib = KGSL_CONVERT_TO_MBPS(990),
+		.ib = KGSL_CONVERT_TO_MBPS(1300),
 	},
 };
 
@@ -985,7 +985,7 @@ static struct kgsl_device_platform_data kgsl_2d0_pdata = {
 	.num_levels = 2,
 	.set_grp_async = NULL,
 	.idle_timeout = HZ/10,
-	.nap_allowed = false,
+	.nap_allowed = true,
 	.clk_map = KGSL_CLK_CORE | KGSL_CLK_IFACE,
 #ifdef CONFIG_MSM_BUS_SCALING
 	.bus_scale_table = &grp2d0_bus_scale_pdata,
@@ -1032,7 +1032,7 @@ static struct kgsl_device_platform_data kgsl_2d1_pdata = {
 	.num_levels = 2,
 	.set_grp_async = NULL,
 	.idle_timeout = HZ/10,
-	.nap_allowed = false,
+	.nap_allowed = true,
 	.clk_map = KGSL_CLK_CORE | KGSL_CLK_IFACE,
 #ifdef CONFIG_MSM_BUS_SCALING
 	.bus_scale_table = &grp2d1_bus_scale_pdata,
@@ -1732,11 +1732,10 @@ struct platform_device msm8x60_device_vpe = {
 
 #endif
 
-
 #define MIPI_DSI_HW_BASE	0x04700000
 #define ROTATOR_HW_BASE		0x04E00000
 #define TVENC_HW_BASE		0x04F00000
-#define MDP_HW_BASE			0x05100000
+#define MDP_HW_BASE		0x05100000
 
 static struct resource msm_mipi_dsi_resources[] = {
 	{
@@ -1811,6 +1810,10 @@ static struct msm_rotator_platform_data rotator_pdata = {
 	.hardware_version_number = 0x01010307,
 	.rotator_clks = rotator_clocks,
 	.regulator_name = "fs_rot",
+#ifdef CONFIG_MSM_BUS_SCALING
+	.bus_scale_table = &rotator_bus_scale_pdata,
+#endif
+
 };
 
 struct platform_device msm_rotator_device = {
@@ -2534,7 +2537,7 @@ struct msm_vidc_platform_data vidc_platform_data = {
         .memtype = ION_CP_MM_HEAP_ID,
         .enable_ion = 1,
 #else
-    .memtype = MEMTYPE_SMI_KERNEL,
+	.memtype = MEMTYPE_SMI_KERNEL,
 	.enable_ion = 0,
 #endif
 	.disable_dmx = 0,

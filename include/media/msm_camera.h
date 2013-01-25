@@ -14,7 +14,7 @@
 #endif
 
 #ifdef __KERNEL__
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 #endif
 #define MSM_CAM_IOCTL_MAGIC 'm'
 

@@ -13,7 +13,7 @@
 #ifndef _VCD_CORE_H_
 #define _VCD_CORE_H_
 
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 #include <media/msm/vcd_api.h>
 #include "vcd_ddl_api.h"
 
@@ -185,7 +185,6 @@ struct vcd_clnt_ctxt {
 	u32 live;
 	u32 decoding;
 	u32 bframe;
-	u32 num_slices;
 
 	struct vcd_property_frame_rate frm_rate;
 	u32 frm_p_units;

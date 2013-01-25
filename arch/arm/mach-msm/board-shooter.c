@@ -131,7 +131,7 @@
 #include "acpuclock.h"
 #include <mach/board_htc.h>
 
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 #include <mach/ion.h>
 
 #ifdef CONFIG_PERFLOCK
@@ -2136,7 +2136,9 @@ static struct platform_device msm_batt_device = {
 
 #define MSM_ION_WB_BASE       (0x80000000 - MSM_ION_WB_SIZE)
 #define MSM_ION_ROTATOR_BASE  (MSM_ION_WB_BASE - MSM_ION_ROTATOR_SIZE)
-#define MSM_ION_QSECOM_BASE   (MSM_ION_ROTATOR_BASE - MSM_ION_QSECOM_SIZE)
+#define MSM_ION_CAMERA_BASE   (MSM_ION_ROTATOR_BASE - MSM_ION_CAMERA_SIZE)
+#define MSM_ION_QSECOM_BASE   (MSM_ION_CAMERA_BASE - MSM_ION_QSECOM_SIZE)
+#define MSM_ION_SF_BASE       (MSM_ION_QSECOM_BASE - MSM_ION_SF_SIZE)
 
 #else /* CONFIG_MSM_MULTIMEDIA_USE_ION */
 #define MSM_ION_HEAP_NUM      1
@@ -6361,8 +6363,9 @@ static struct ion_cp_heap_pdata cp_wb_ion_pdata = {
 	.align = PAGE_SIZE,
 };
 
-static struct ion_co_heap_pdata mm_fw_co_ion_pdata = {
+static struct ion_co_heap_pdata fw_co_ion_pdata = {
 	.adjacent_mem_id = ION_CP_MM_HEAP_ID,
+	.align = SZ_128K,
 };
 
 static struct ion_co_heap_pdata co_ion_pdata = {
@@ -6371,30 +6374,20 @@ static struct ion_co_heap_pdata co_ion_pdata = {
 };
 
 #endif
-
-/**
- * These heaps are listed in the order they will be allocated. Due to
- * video hardware restrictions and content protection the FW heap has to
- * be allocated adjacent (below) the MM heap and the MFC heap has to be
- * allocated after the MM heap to ensure MFC heap is not more than 256MB
- * away from the base address of the FW heap.
- * However, the order of FW heap and MM heap doesn't matter since these
- * two heaps are taken care of by separate code to ensure they are adjacent
- * to each other.
- * Don't swap the order unless you know what you are doing!
- */
-struct ion_platform_heap msm8x60_heaps [] = {
+static struct ion_platform_data ion_pdata = {
+	.nr = MSM_ION_HEAP_NUM,
+	.heaps = {
 		{
 			.id	= ION_SYSTEM_HEAP_ID,
 			.type	= ION_HEAP_TYPE_SYSTEM,
 			.name	= ION_VMALLOC_HEAP_NAME,
 		},
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+		/* SMI part */
 		{
 			.id	= ION_CP_MM_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CP,
 			.name	= ION_MM_HEAP_NAME,
-			.base   = MSM_ION_MM_BASE,
 			.size	= MSM_ION_MM_SIZE,
 			.memory_type = ION_SMI_TYPE,
 			.extra_data = (void *) &cp_mm_ion_pdata,
@@ -6403,44 +6396,20 @@ struct ion_platform_heap msm8x60_heaps [] = {
 			.id	= ION_MM_FIRMWARE_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
 			.name	= ION_MM_FIRMWARE_HEAP_NAME,
-			.base	= MSM_MM_FW_BASE,
-			.size	= MSM_MM_FW_SIZE,
+			.size	= MSM_ION_MM_FW_SIZE,
 			.memory_type = ION_SMI_TYPE,
-			.extra_data = (void *) &mm_fw_co_ion_pdata,
+			.extra_data = (void *) &fw_co_ion_pdata,
 		},
 		{
 			.id	= ION_CP_MFC_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CP,
 			.name	= ION_MFC_HEAP_NAME,
-			.base	= MSM_ION_MFC_BASE,
 			.size	= MSM_ION_MFC_SIZE,
 			.memory_type = ION_SMI_TYPE,
 			.extra_data = (void *) &cp_mfc_ion_pdata,
 		},
-		{
-			.id	= ION_SF_HEAP_ID,
-			.type	= ION_HEAP_TYPE_CARVEOUT,
-			.name	= ION_SF_HEAP_NAME,
-			.size	= MSM_ION_SF_SIZE,
-			.memory_type = ION_EBI_TYPE,
-			.extra_data = (void *)&co_ion_pdata,
-		},
-		{
-			.id	= ION_CAMERA_HEAP_ID,
-			.type	= ION_HEAP_TYPE_CARVEOUT,
-			.name	= ION_CAMERA_HEAP_NAME,
-			.size	= MSM_ION_CAMERA_SIZE,
-			.memory_type = ION_EBI_TYPE,
-			.extra_data = &co_ion_pdata,
-		},
-		{
-			.id	= ION_CP_WB_HEAP_ID,
-			.type	= ION_HEAP_TYPE_CP,
-			.name	= ION_WB_HEAP_NAME,
-			.size	= MSM_ION_WB_SIZE,
-			.memory_type = ION_EBI_TYPE,
-			.extra_data = (void *) &cp_wb_ion_pdata,
-		},
+		/* EBI part: QSECOM needs to be the 1st one to avoid wasting memory when it's disabled. */
+#ifdef CONFIG_TZCOM
 		{
 			.id	= ION_QSECOM_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
@@ -6449,20 +6418,45 @@ struct ion_platform_heap msm8x60_heaps [] = {
 			.memory_type = ION_EBI_TYPE,
 			.extra_data = (void *) &co_ion_pdata,
 		},
+#endif
 		{
-			.id	= ION_AUDIO_HEAP_ID,
+			.id	= ION_CP_ROTATOR_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
-			.name	= ION_AUDIO_HEAP_NAME,
-			.size	= MSM_ION_AUDIO_SIZE,
+			.name	= ION_ROTATOR_HEAP_NAME,
+			.base	= MSM_ION_ROTATOR_BASE,
+			.size	= MSM_ION_ROTATOR_SIZE,
 			.memory_type = ION_EBI_TYPE,
-			.extra_data = (void *)&co_ion_pdata,
+			.extra_data = &co_ion_pdata,
+		},
+		{
+			.id	= ION_CAMERA_HEAP_ID,
+			.type	= ION_HEAP_TYPE_CARVEOUT,
+			.name	= ION_CAMERA_HEAP_NAME,
+			.base	= MSM_ION_CAMERA_BASE,
+			.size	= MSM_ION_CAMERA_SIZE,
+			.memory_type = ION_EBI_TYPE,
+			.extra_data = &co_ion_pdata,
+		},
+                {
+                        .id     = ION_SF_HEAP_ID,
+                        .type   = ION_HEAP_TYPE_CARVEOUT,
+                        .name   = ION_SF_HEAP_NAME,
+                        .base   = MSM_ION_SF_BASE,
+                        .size   = MSM_ION_SF_SIZE,
+                        .memory_type = ION_EBI_TYPE,
+                        .extra_data = (void *) &co_ion_pdata,
+                },
+		{
+			.id	= ION_CP_WB_HEAP_ID,
+			.type	= ION_HEAP_TYPE_CP,
+			.name	= ION_WB_HEAP_NAME,
+			.base	= MSM_ION_WB_BASE,
+			.size	= MSM_ION_WB_SIZE,
+			.memory_type = ION_EBI_TYPE,
+			.extra_data = (void *) &cp_wb_ion_pdata,
 		},
 #endif
-};
-
-static struct ion_platform_data ion_pdata = {
-	.nr = MSM_ION_HEAP_NUM,
-	.heaps = msm8x60_heaps,
+	}
 };
 
 static struct platform_device ion_dev = {

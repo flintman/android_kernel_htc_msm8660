@@ -28,7 +28,7 @@
 #include <linux/file.h>
 #include <linux/major.h>
 #include <linux/regulator/consumer.h>
-#include <linux/msm_ion.h>
+#include <linux/ion.h>
 
 #define DRIVER_NAME "msm_rotator"
 

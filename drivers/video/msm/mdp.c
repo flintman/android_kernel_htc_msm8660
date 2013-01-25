@@ -1329,14 +1329,13 @@ void mdp_color_enhancement(const struct mdp_reg *reg_seq, int size)
 	int i;
 
 	printk(KERN_INFO "%s\n", __func__);
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	for (i = 0; i < size; i++) {
 		if (reg_seq[i].mask == 0x0)
 			outpdw(MDP_BASE + reg_seq[i].reg, reg_seq[i].val);
 		else
 			mdp_write_reg_mask(reg_seq[i].reg, reg_seq[i].val, reg_seq[i].mask);
 	}
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+
 	return ;
 }
 
@@ -1513,6 +1512,9 @@ static int mdp_probe(struct platform_device *pdev)
 			if_no = EXTERNAL_INTF_SEL;
 			mfd->dma = &dma_e_data;
 		}
+		mfd->lut_update = mdp_lut_update_nonlcdc;
+		mfd->do_histogram = mdp_do_histogram;
+		mfd->get_gamma_curvy = mdp_get_gamma_curvy;
 		mdp4_display_intf_sel(if_no, DSI_VIDEO_INTF);
 		break;
 

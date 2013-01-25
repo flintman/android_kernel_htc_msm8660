@@ -15,6 +15,7 @@
 
 #include <linux/idr.h>
 #include <linux/wakelock.h>
+#include <linux/pm_qos_params.h>
 #include <linux/earlysuspend.h>
 
 #include "kgsl.h"
@@ -95,7 +96,8 @@ struct kgsl_functable {
 	/* Optional functions - these functions are not mandatory.  The
 	   driver will check that the function pointer is not NULL before
 	   calling the hook */
-	void (*setstate) (struct kgsl_device *device, uint32_t flags);
+	void (*setstate) (struct kgsl_device *device, unsigned int context_id,
+			uint32_t flags);
 	int (*drawctxt_create) (struct kgsl_device *device,
 		struct kgsl_pagetable *pagetable, struct kgsl_context *context,
 		uint32_t flags);
@@ -184,9 +186,16 @@ struct kgsl_device {
 	struct wake_lock idle_wakelock;
 	struct kgsl_pwrscale pwrscale;
 	struct kobject pwrscale_kobj;
+	struct pm_qos_request_list pm_qos_req_dma;
 	struct work_struct ts_expired_ws;
 	struct list_head events;
 	s64 on_time;
+
+	/* page fault debugging parameters */
+	struct work_struct print_fault_ib;
+	unsigned int page_fault_ptbase;
+	unsigned int page_fault_ib1;
+	unsigned int page_fault_rptr;
 };
 
 struct kgsl_context {
@@ -197,13 +206,18 @@ struct kgsl_context {
 
 	/* Pointer to the device specific context information */
 	void *devctxt;
+	/*
+	 * Status indicating whether a gpu reset occurred and whether this
+	 * context was responsible for causing it
+	 */
+	unsigned int reset_status;
 };
 
 struct kgsl_process_private {
 	unsigned int refcnt;
 	pid_t pid;
 	spinlock_t mem_lock;
-	struct list_head mem_list;
+	struct rb_root mem_rb;
 	struct kgsl_pagetable *pagetable;
 	struct list_head list;
 	struct kobject kobj;

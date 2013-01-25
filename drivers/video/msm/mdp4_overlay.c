@@ -651,6 +651,7 @@ int mdp4_overlay_format2type(uint32 format)
 #define C2_R_Cr		2	/* R/Cr */
 #define C1_B_Cb		1	/* B/Cb */
 #define C0_G_Y		0	/* G/luma */
+#define YUV_444_MAX_WIDTH		1280	/* Max width for YUV 444*/
 
 int mdp4_overlay_format2pipe(struct mdp4_overlay_pipe *pipe)
 {
@@ -824,10 +825,24 @@ int mdp4_overlay_format2pipe(struct mdp4_overlay_pipe *pipe)
 			pipe->element1 = C1_B_Cb;
 			pipe->element0 = C2_R_Cr;
 			pipe->chroma_sample = MDP4_CHROMA_H2V1;
+		} else if (pipe->src_format == MDP_Y_CRCB_H1V1) {
+			pipe->element1 = C1_B_Cb;
+			pipe->element0 = C2_R_Cr;
+			if (pipe->src_width > YUV_444_MAX_WIDTH)
+				pipe->chroma_sample = MDP4_CHROMA_H1V2;
+			else
+				pipe->chroma_sample = MDP4_CHROMA_RGB;
 		} else if (pipe->src_format == MDP_Y_CBCR_H2V1) {
 			pipe->element1 = C2_R_Cr;
 			pipe->element0 = C1_B_Cb;
 			pipe->chroma_sample = MDP4_CHROMA_H2V1;
+		} else if (pipe->src_format == MDP_Y_CBCR_H1V1) {
+			pipe->element1 = C2_R_Cr;
+			pipe->element0 = C1_B_Cb;
+			if (pipe->src_width > YUV_444_MAX_WIDTH)
+				pipe->chroma_sample = MDP4_CHROMA_H1V2;
+			else
+				pipe->chroma_sample = MDP4_CHROMA_RGB;
 		} else if (pipe->src_format == MDP_Y_CRCB_H2V2) {
 			pipe->element1 = C1_B_Cb;
 			pipe->element0 = C2_R_Cr;
@@ -2037,7 +2052,7 @@ static uint32 mdp4_overlay_get_perf_level(uint32 width, uint32 height,
 		size_720p = OVERLAY_720P_TILE_SIZE;
 	if (width*height <= OVERLAY_VGA_SIZE)
 		return OVERLAY_PERF_LEVEL3;
-	else if (virtualfb3d.is_3d == 0 && width*height <= size_720p)
+	else if (width*height <= size_720p)
 		return OVERLAY_PERF_LEVEL2;
 	else
 		return OVERLAY_PERF_LEVEL1;
@@ -2130,7 +2145,7 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 			/* Run blt mode only when camera is not lanuch or dtv is connected */
 #ifdef	CONFIG_FB_MSM_DTV
 			/* FIXME: Remove source camera check temporarily. It needs support from framework. */
-			} else if (mfd->blt_mode && (atomic_read(&mdp_dtv_on) || virtualfb3d.is_3d == 1)) {
+			} else if (mfd->blt_mode && atomic_read(&mdp_dtv_on)) {
 #else
 			} else if (mfd->blt_mode && !atomic_read(&ovsource)) {
 #endif
@@ -2192,7 +2207,6 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 	struct mdp4_overlay_pipe *pipe;
 	uint32 i, ref_cnt = 0;
 	uint32 flags;
-	long timeout;
 
 	if (mfd == NULL)
 		return -ENODEV;
@@ -2213,9 +2227,7 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 
 	if (atomic_read(&ov_play)) {
 		mutex_unlock(&mfd->dma->ov_mutex);
-		timeout = wait_for_completion_timeout(&ov_comp, HZ/2);
-		if (!timeout)
-			PR_DISP_INFO("%s(%d) ov play wait timeout\n", __func__, __LINE__);
+		wait_for_completion(&ov_comp);
 		PR_DISP_INFO("%s(%d)wait ov play success ndx %d mixer %d\n", __func__, __LINE__, pipe->pipe_ndx, pipe->mixer_num);
 		if (mutex_lock_interruptible(&mfd->dma->ov_mutex))
 			return -EINTR;
@@ -2468,16 +2480,15 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 		return -ENODEV;
 	}
 
-	if (pipe->pipe_type == OVERLAY_TYPE_VIDEO && atomic_read(&ov_unset)) {
-		complete(&ov_comp);
+	if (pipe->pipe_type == OVERLAY_TYPE_VIDEO && atomic_read(&ov_unset))
 		return 0;
-	}
 
 	if (mfd->esd_fixup)
 		mfd->esd_fixup((uint32_t)mfd);
 
 	if (mutex_lock_interruptible(&mfd->dma->ov_mutex))
 		return -EINTR;
+
 	pd = &ctrl->ov_pipe[pipe->pipe_num];
 	if (pd->player && pipe != pd->player) {
 		if (pipe->pipe_type == OVERLAY_TYPE_RGB) {

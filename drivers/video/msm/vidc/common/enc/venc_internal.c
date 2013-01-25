@@ -33,13 +33,11 @@
 #include <media/msm/vidc_init.h>
 #include "venc_internal.h"
 
-/*HTC_START*/
-extern u32 vidc_msg_debug;
-#define DBG(x...)				\
-	if (vidc_msg_debug) {			\
-		printk(KERN_DEBUG "[VID] " x);	\
-	}
-/*HTC_END*/
+#if DEBUG
+#define DBG(x...) printk(KERN_DEBUG x)
+#else
+#define DBG(x...)
+#endif
 
 #define ERR(x...) printk(KERN_ERR x)
 static unsigned int vidc_mmu_subsystem[] = {
@@ -1657,6 +1655,7 @@ u32 vid_enc_encode_frame(struct video_client_ctx *client_ctx,
 	int pmem_fd;
 	struct file *file;
 	s32 buffer_index = -1;
+
 	u32 vcd_status = VCD_ERR_FAIL;
 
 	if (!client_ctx || !input_frame_info)
@@ -1686,6 +1685,7 @@ u32 vid_enc_encode_frame(struct video_client_ctx *client_ctx,
 
 		/* Rely on VCD using the same flags as OMX */
 		vcd_input_buffer.flags = input_frame_info->flags;
+
 		vcd_status = vcd_encode_frame(client_ctx->vcd_handle,
 		&vcd_input_buffer);
 		if (!vcd_status)
