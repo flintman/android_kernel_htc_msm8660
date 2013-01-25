@@ -1657,10 +1657,6 @@ u32 vid_enc_encode_frame(struct video_client_ctx *client_ctx,
 	int pmem_fd;
 	struct file *file;
 	s32 buffer_index = -1;
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	u32 ion_flag = 0;
-#endif
-
 	u32 vcd_status = VCD_ERR_FAIL;
 
 	if (!client_ctx || !input_frame_info)
@@ -1690,21 +1686,6 @@ u32 vid_enc_encode_frame(struct video_client_ctx *client_ctx,
 
 		/* Rely on VCD using the same flags as OMX */
 		vcd_input_buffer.flags = input_frame_info->flags;
-
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-		ion_flag = vidc_get_fd_info(client_ctx, BUFFER_TYPE_INPUT,
-				pmem_fd, kernel_vaddr, buffer_index);
-
-		if (vcd_input_buffer.data_len > 0) {
-			if (ion_flag == CACHED) {
-				clean_caches(
-				(unsigned long) vcd_input_buffer.virtual,
-				(unsigned long) vcd_input_buffer.data_len,
-				(phy_addr + input_frame_info->offset));
-			}
-		}
-#endif
-
 		vcd_status = vcd_encode_frame(client_ctx->vcd_handle,
 		&vcd_input_buffer);
 		if (!vcd_status)

@@ -24,7 +24,7 @@
 
 #include <linux/ashmem.h>
 #include <linux/major.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 #include <mach/socinfo.h>
 
 #include "kgsl.h"

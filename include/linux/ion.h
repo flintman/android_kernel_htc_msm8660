@@ -41,6 +41,7 @@ enum ion_heap_type {
 	ION_HEAP_TYPE_SYSTEM_CONTIG,
 	ION_HEAP_TYPE_CARVEOUT,
 	ION_HEAP_TYPE_DMA,
+	ION_HEAP_TYPE_CP,
 	ION_HEAP_TYPE_CUSTOM, /* must be last so device specific heaps always
 				 are at the end of this enum */
 	ION_NUM_HEAPS,
@@ -194,8 +195,7 @@ void ion_client_destroy(struct ion_client *client);
  * an opaque handle to it.
  */
 struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
-			     size_t align, unsigned int heap_mask,
-			     unsigned int flags);
+			     size_t align,unsigned int flags);
 
 /**
  * ion_free - free a handle
@@ -244,7 +244,8 @@ struct sg_table *ion_sg_table(struct ion_client *client,
  * Map the given handle into the kernel and return a kernel address that
  * can be used to access this address.
  */
-void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle);
+void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle,
+			unsigned long flags);
 
 /**
  * ion_unmap_kernel() - destroy a kernel mapping for a handle
@@ -373,8 +374,7 @@ void ion_unmap_iommu(struct ion_client *client, struct ion_handle *handle,
  * Secure a heap
  * Returns 0 on success
  */
-int ion_secure_heap(struct ion_device *dev, int heap_id, int version,
-			void *data);
+int ion_secure_heap(struct ion_device *dev, int heap_id);
 
 /**
  * ion_unsecure_heap - un-secure a heap
@@ -387,8 +387,7 @@ int ion_secure_heap(struct ion_device *dev, int heap_id, int version,
  * Un-secure a heap
  * Returns 0 on success
  */
-int ion_unsecure_heap(struct ion_device *dev, int heap_id, int version,
-			void *data);
+int ion_unsecure_heap(struct ion_device *dev, int heap_id);
 
 /**
  * msm_ion_do_cache_op - do cache operations.
@@ -452,7 +451,7 @@ static inline struct sg_table *ion_sg_table(struct ion_client *client,
 }
 
 static inline void *ion_map_kernel(struct ion_client *client,
-	struct ion_handle *handle)
+	struct ion_handle *handle, unsigned long flags)
 {
 	return ERR_PTR(-ENODEV);
 }

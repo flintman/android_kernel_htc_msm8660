@@ -23,7 +23,7 @@
 
 #include <mach/board.h>
 #ifdef CONFIG_MSM_CAMERA_V4L2
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 #include <linux/regulator/consumer.h>
 #include <media/msm_camera_v4l2.h>
 #else

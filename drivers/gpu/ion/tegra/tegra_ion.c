@@ -15,7 +15,7 @@
  */
 
 #include <linux/err.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include "../ion_priv.h"

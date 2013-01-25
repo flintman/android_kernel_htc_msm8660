@@ -239,9 +239,7 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 	struct file *file;
 	s32 buffer_index = -1;
 	enum vdec_picture pic_type;
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	u32 ion_flag = 0;
-#endif
+
 	struct vdec_output_frameinfo  *output_frame;
 
 	if (!client_ctx || !vcd_frame_data) {
@@ -348,17 +346,6 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 		ERR("vid_dec_output_frame_done UVA can not be found\n");
 		vdec_msg->vdec_msg_info.status_code = VDEC_S_EFATAL;
 	}
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	if (vcd_frame_data->data_len > 0) {
-		ion_flag = vidc_get_fd_info(client_ctx, BUFFER_TYPE_OUTPUT,
-				pmem_fd, kernel_vaddr, buffer_index);
-		if (ion_flag == CACHED) {
-			invalidate_caches(kernel_vaddr,
-					(unsigned long)vcd_frame_data->data_len,
-					phy_addr);
-		}
-	}
-#endif
 	mutex_lock(&client_ctx->msg_queue_lock);
 	list_add_tail(&vdec_msg->list, &client_ctx->msg_queue);
 	mutex_unlock(&client_ctx->msg_queue_lock);
@@ -1203,9 +1190,6 @@ static u32 vid_dec_decode_frame(struct video_client_ctx *client_ctx,
 	struct file *file;
 	s32 buffer_index = -1;
 	u32 vcd_status = VCD_ERR_FAIL;
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	u32 ion_flag = 0;
-#endif
 
 	if (!client_ctx || !input_frame_info)
 		return false;
@@ -1233,20 +1217,6 @@ static u32 vid_dec_decode_frame(struct video_client_ctx *client_ctx,
 		vcd_input_buffer.flags = input_frame_info->flags;
 		vcd_input_buffer.desc_buf = desc_buf;
 		vcd_input_buffer.desc_size = desc_size;
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-		if (vcd_input_buffer.data_len > 0) {
-			ion_flag = vidc_get_fd_info(client_ctx,
-						BUFFER_TYPE_INPUT,
-						pmem_fd,
-						kernel_vaddr,
-						buffer_index);
-			if (ion_flag == CACHED) {
-				clean_caches(kernel_vaddr,
-				(unsigned long)vcd_input_buffer.data_len,
-				phy_addr);
-			}
-		}
-#endif
 		vcd_status = vcd_decode_frame(client_ctx->vcd_handle,
 					      &vcd_input_buffer);
 		if (!vcd_status)
