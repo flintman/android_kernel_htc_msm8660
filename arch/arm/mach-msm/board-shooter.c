@@ -2117,17 +2117,17 @@ static struct platform_device msm_batt_device = {
 #endif
 
 #define MSM_ION_AUDIO_SIZE	MSM_PMEM_AUDIO_SIZE
-#define MSM_ION_QSECOM_SIZE	0x600000 /* (6MB) */
 #define MSM_SMI_BASE          0x38000000
 #define MSM_MM_FW_BASE		MSM_SMI_BASE
 #define MSM_MM_FW_SIZE		(0x200000 - MSM_ION_HOLE_SIZE) /*(2MB-128KB)*/
 #define MSM_ION_CAMERA_SIZE     MSM_PMEM_ADSP_SIZE
+#define MSM_ION_QSECOM_SIZE	0x600000 /* (6MB) */
 
 #ifdef CONFIG_TZCOM
 #define MSM_ION_QSECOM_SIZE   MSM_PMEM_KERNEL_EBI1_SIZE
-#define MSM_ION_HEAP_NUM      7
+#define MSM_ION_HEAP_NUM      9
 #else
-#define MSM_ION_HEAP_NUM      6
+#define MSM_ION_HEAP_NUM      8
 #endif
 
 #define MSM_ION_MM_FW_BASE    0x38000000
@@ -2185,6 +2185,7 @@ static struct android_pmem_platform_data android_pmem_audio_pdata = {
 	.name = "pmem_audio",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
 	.cached = 0,
+	.memory_type = MEMTYPE_EBI1,
 };
 
 static struct platform_device android_pmem_audio_device = {
@@ -3769,8 +3770,11 @@ static struct memtype_reserve msm8x60_reserve_table[] __initdata = {
 		.limit	=	USER_SMI_SIZE,
 		.flags	=	MEMTYPE_FLAGS_FIXED,
 	},
-#endif
 	[MEMTYPE_EBI0] = {
+		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+	},
+#endif
+	[MEMTYPE_EBI1] = {
 		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
 	},
 };
@@ -3816,13 +3820,13 @@ static void __init reserve_pmem_memory(void)
 static void __init reserve_ion_memory(void)
 {
 #if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
-//	msm8x60_reserve_table[MEMTYPE_EBI0].size += MSM_ION_SF_SIZE;
+	msm8x60_reserve_table[MEMTYPE_EBI1].size += MSM_ION_SF_SIZE;
 	msm8x60_reserve_table[MEMTYPE_SMI].size += MSM_ION_MM_FW_SIZE;
 	msm8x60_reserve_table[MEMTYPE_SMI].size += MSM_ION_MM_SIZE;
 	msm8x60_reserve_table[MEMTYPE_SMI].size += MSM_ION_MFC_SIZE;
-	msm8x60_reserve_table[MEMTYPE_EBI0].size += MSM_ION_ROTATOR_SIZE;
+	msm8x60_reserve_table[MEMTYPE_EBI1].size += MSM_ION_ROTATOR_SIZE;
 #ifdef CONFIG_TZCOM
-	msm8x60_reserve_table[MEMTYPE_EBI0].size += MSM_ION_QSECOM_SIZE;
+	msm8x60_reserve_table[MEMTYPE_EBI1].size += MSM_ION_QSECOM_SIZE;
 #endif
 #endif
 }
