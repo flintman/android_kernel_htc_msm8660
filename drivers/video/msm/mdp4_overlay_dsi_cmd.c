@@ -43,6 +43,8 @@ static struct mdp4_overlay_pipe *dsi_pipe;
 static struct msm_fb_data_type *dsi_mfd;
 static atomic_t busy_wait_cnt;
 
+#define MAX_CONTROLLER	1
+
 static int vsync_start_y_adjust = 4;
 
 #define OVERLAY_BLT_EMBEDDED
@@ -99,6 +101,14 @@ void mdp4_dsi_color_enhancement(const struct mdp_reg *reg_seq, int size)
 	dsi_mutex_unlock();
 
 	return ;
+}
+
+void mdp4_dsi_cmd_base_swap(int cndx, struct mdp4_overlay_pipe *pipe)
+{
+	if (cndx >= MAX_CONTROLLER) {
+		pr_err("%s: out or range: cndx=%d\n", __func__, cndx);
+		return;
+	}
 }
 
 void mdp4_mipi_vsync_enable(struct msm_fb_data_type *mfd,

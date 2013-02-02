@@ -48,6 +48,8 @@
 int first_pixel_start_x;
 int first_pixel_start_y;
 
+#define MAX_CONTROLLER	1
+
 static int writeback_offset;
 
 static struct mdp4_overlay_pipe *lcdc_pipe;
@@ -346,6 +348,14 @@ void mdp4_overlay_lcdc_wait4vsync(struct msm_fb_data_type *mfd)
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 	wait_for_completion_killable(&lcdc_comp);
 	mdp_disable_irq(MDP_DMA2_TERM);
+}
+
+void mdp4_lcdc_base_swap(int cndx, struct mdp4_overlay_pipe *pipe)
+{
+	if (cndx >= MAX_CONTROLLER) {
+		pr_err("%s: out or range: cndx=%d\n", __func__, cndx);
+		return;
+	}
 }
 
 void mdp4_overlay_lcdc_vsync_push(struct msm_fb_data_type *mfd,

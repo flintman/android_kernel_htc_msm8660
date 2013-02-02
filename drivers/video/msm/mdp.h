@@ -55,6 +55,7 @@
 
 extern uint32 mdp_hw_revision;
 extern ulong mdp4_display_intf;
+extern int mdp_rev;
 
 #define MDP4_REVISION_V1		0
 #define MDP4_REVISION_V2		1
@@ -649,6 +650,7 @@ struct mdp_reg {
 void mdp_hw_init(void);
 int mdp_ppp_pipe_wait(void);
 void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd);
+void mdp_clk_ctrl(int on);
 void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 		   boolean isr);
 void mdp_set_dma_pan_info(struct fb_info *info, struct mdp_dirty_region *dirty,

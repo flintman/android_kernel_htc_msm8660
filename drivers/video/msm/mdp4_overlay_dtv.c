@@ -61,6 +61,8 @@ static int first_pixel_start_y;
 
 struct mdp4_overlay_pipe *dtv_pipe;
 
+#define MAX_CONTROLLER	1
+
 int mdp4_dtv_on(struct platform_device *pdev)
 {
 	int dtv_width;
@@ -280,6 +282,15 @@ int mdp4_dtv_on(struct platform_device *pdev)
 
 	return ret;
 }
+
+void mdp4_dtv_base_swap(int cndx, struct mdp4_overlay_pipe *pipe)
+{
+	if (cndx >= MAX_CONTROLLER) {
+		pr_err("%s: out or range: cndx=%d\n", __func__, cndx);
+		return;
+	}
+}
+
 
 int mdp4_dtv_off(struct platform_device *pdev)
 {

@@ -172,6 +172,7 @@ struct msm_fb_data_type {
 	struct completion msmfb_update_notify;
 	struct completion msmfb_no_update_notify;
 	u32 ov_start, ov_end;
+	u32 mdp_rev;
 
 #ifdef CONFIG_FB_MSM_OVERLAY
 	uint32_t	blt_base, blt_size;

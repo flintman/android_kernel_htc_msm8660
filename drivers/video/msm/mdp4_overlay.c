@@ -63,6 +63,7 @@ atomic_t ov_unset = ATOMIC_INIT(0);
 struct mdp4_overlay_ctrl {
 	struct mdp4_pipe_desc ov_pipe[OVERLAY_PIPE_MAX];/* 4 */
 	struct mdp4_overlay_pipe plist[MDP4_MAX_PIPE];	/* 4 + 2 */
+	struct mdp4_overlay_pipe *baselayer[MDP4_MIXER_MAX];
 	struct mdp4_overlay_pipe *stage[MDP4_MAX_MIXER][MDP4_MIXER_STAGE_MAX];
 	uint32 panel_mode;
 	uint32 mixer0_played;
@@ -113,6 +114,21 @@ struct mdp4_overlay_ctrl {
 			.pipe_num = OVERLAY_PIPE_VG2,
 			.pipe_ndx = 6,
 		},
+		{
+			.pipe_type = OVERLAY_TYPE_BF,
+			.pipe_num = OVERLAY_PIPE_RGB3,
+			.pipe_ndx = 7,
+		},
+		{
+			.pipe_type = OVERLAY_TYPE_BF,
+			.pipe_num = OVERLAY_PIPE_VG3,
+			.pipe_ndx = 8,
+		},
+		{
+			.pipe_type = OVERLAY_TYPE_BF,
+			.pipe_num = OVERLAY_PIPE_VG4,
+			.pipe_ndx = 9,
+		},
 	},
 };
 
@@ -139,6 +155,11 @@ void mdp4_overlay_panel_mode(int mixer_num, uint32 mode)
 uint32 mdp4_overlay_panel_list(void)
 {
 	return ctrl->panel_mode;
+}
+
+int mdp4_overlay_borderfill_supported(void)
+{
+	return (mdp_rev >= MDP_REV_42);
 }
 
 void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int atv)
@@ -640,6 +661,8 @@ int mdp4_overlay_format2type(uint32 format)
 	case MDP_YCRCB_H1V1:
 	case MDP_YCBCR_H1V1:
 		return OVERLAY_TYPE_VIDEO;
+	case MDP_RGB_BORDERFILL:
+		return OVERLAY_TYPE_BF;
 	default:
 		mdp4_stat.err_format++;
 		return -ERANGE;
@@ -911,6 +934,9 @@ int mdp4_overlay_format2pipe(struct mdp4_overlay_pipe *pipe)
 			pipe->element2 = C2_R_Cr;   /* R */
 		}
 		pipe->bpp = 3;  /* 3 bpp */
+	case MDP_RGB_BORDERFILL:
+		pipe->alpha_enable = 0;
+		pipe->alpha = 0;
 		break;
 	default:
 		/* not likely */
@@ -1289,6 +1315,132 @@ void mdp4_mixer_stage_down(struct mdp4_overlay_pipe *pipe)
 	ctrl->stage[pipe->mixer_num][pipe->mixer_stage] = NULL;	/* clear it */
 }
 
+/*
+ * mixer0: rgb3: border color at register 0x15004, 0x15008
+ * mixer1:  vg3: border color at register 0x1D004, 0x1D008
+ * mixer2:  xxx: border color at register 0x8D004, 0x8D008
+ */
+void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
+{
+	struct mdp4_overlay_pipe *bspipe;
+	int ptype, pnum, pndx, mixer;
+	int format, alpha_enable, alpha;
+
+	if (pipe->pipe_type != OVERLAY_TYPE_BF)
+		return;
+
+	mixer = pipe->mixer_num;
+
+	if (ctrl->baselayer[mixer])
+		return;
+
+	bspipe = ctrl->stage[mixer][MDP4_MIXER_STAGE_BASE];
+
+	/*
+	 * bspipe is clone here
+	 * get real pipe
+	 */
+	bspipe = mdp4_overlay_ndx2pipe(bspipe->pipe_ndx);
+
+	/* save original base layer */
+	ctrl->baselayer[mixer] = bspipe;
+
+	pipe->alpha = 0;	/* make sure bf pipe has alpha 0 */
+	ptype = pipe->pipe_type;
+	pnum = pipe->pipe_num;
+	pndx = pipe->pipe_ndx;
+	format = pipe->src_format;
+	alpha_enable = pipe->alpha_enable;
+	alpha = pipe->alpha;
+	*pipe = *bspipe;	/* keep base layer configuration */
+	pipe->pipe_type = ptype;
+	pipe->pipe_num = pnum;
+	pipe->pipe_ndx = pndx;
+	pipe->src_format = format;
+	pipe->alpha_enable = alpha_enable;
+	pipe->alpha = alpha;
+
+	/* free original base layer pipe to be sued as normal pipe */
+	bspipe->pipe_used = 0;
+
+	if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
+		mdp4_dsi_video_base_swap(0, pipe);
+	else if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
+		mdp4_dsi_cmd_base_swap(0, pipe);
+	else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
+		mdp4_lcdc_base_swap(0, pipe);
+	else if (ctrl->panel_mode & MDP4_PANEL_DTV)
+		mdp4_dtv_base_swap(0, pipe);
+
+	mdp4_overlay_reg_flush(bspipe, 1);
+	/* borderfill pipe as base layer */
+	mdp4_mixer_stage_up(pipe);
+}
+
+void mdp4_overlay_borderfill_stage_down(struct mdp4_overlay_pipe *pipe)
+{
+	struct mdp4_overlay_pipe *bspipe;
+	int ptype, pnum, pndx, mixer;
+	int format, alpha_enable, alpha;
+	struct mdp4_iommu_pipe_info iom;
+
+	if (pipe->pipe_type != OVERLAY_TYPE_BF)
+		return;
+
+	mixer = pipe->mixer_num;
+
+	/* retrieve original base layer */
+	bspipe = ctrl->baselayer[mixer];
+	if (bspipe == NULL) {
+		pr_err("%s: no base layer at mixer=%d\n",
+				__func__, mixer);
+		return;
+	}
+
+	iom = bspipe->iommu;
+	ptype = bspipe->pipe_type;
+	pnum = bspipe->pipe_num;
+	pndx = bspipe->pipe_ndx;
+	format = bspipe->src_format;
+	alpha_enable = bspipe->alpha_enable;
+	alpha = bspipe->alpha;
+	*bspipe = *pipe;	/* restore base layer configuration */
+	bspipe->pipe_type = ptype;
+	bspipe->pipe_num = pnum;
+	bspipe->pipe_ndx = pndx;
+	bspipe->src_format = format;
+	bspipe->alpha_enable = alpha_enable;
+	bspipe->alpha = alpha;
+	bspipe->iommu = iom;
+
+	bspipe->pipe_used++;	/* mark base layer pipe used */
+
+	ctrl->baselayer[mixer] = NULL;
+
+	/* free borderfill pipe */
+	pipe->pipe_used = 0;
+
+	if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
+		mdp4_dsi_video_base_swap(0, bspipe);
+	else if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
+		mdp4_dsi_cmd_base_swap(0, bspipe);
+	else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
+		mdp4_lcdc_base_swap(0, bspipe);
+	else if (ctrl->panel_mode & MDP4_PANEL_DTV)
+		mdp4_dtv_base_swap(0, bspipe);
+
+	/* free borderfill pipe */
+	mdp4_overlay_reg_flush(pipe, 1);
+	mdp4_mixer_stage_down(pipe); /* commit will happen for bspipe up */
+	mdp4_overlay_pipe_free(pipe);
+
+	/* stage up base layer */
+	mdp4_overlay_reg_flush(bspipe, 1);
+	/* restore original base layer */
+	mdp4_mixer_stage_up(bspipe);
+}
+
+
 void mdp4_mixer_blend_setup(struct mdp4_overlay_pipe *pipe)
 {
 	struct mdp4_overlay_pipe *bg_pipe;
@@ -1450,6 +1602,11 @@ struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(
 	int i, j, ndx, found;
 	struct mdp4_overlay_pipe *pipe, *opipe;
 	struct mdp4_pipe_desc  *pd;
+
+	if (ptype == OVERLAY_TYPE_BF) {
+		if (!mdp4_overlay_borderfill_supported())
+			return NULL;
+	}
 
 	found = 0;
 	pipe = &ctrl->plist[0];
@@ -2220,6 +2377,13 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 		mutex_unlock(&mfd->dma->ov_mutex);
 		return -ENODEV;
 	}
+
+	if (pipe->pipe_type == OVERLAY_TYPE_BF) {
+		mdp4_overlay_borderfill_stage_down(pipe);
+		mutex_unlock(&mfd->dma->ov_mutex);
+		return 0;
+	}
+
 	if (virtualfb3d.is_3d)
 		atomic_set(&ov_unset, 1);
 
@@ -2478,6 +2642,11 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 	if (pipe == NULL) {
 		PR_DISP_ERR("%s: req_id=%d Error\n", __func__, req->id);
 		return -ENODEV;
+	}
+
+	if (pipe->pipe_type == OVERLAY_TYPE_BF) {
+		mdp4_overlay_borderfill_stage_up(pipe);
+		return 0;
 	}
 
 	if (pipe->pipe_type == OVERLAY_TYPE_VIDEO && atomic_read(&ov_unset))

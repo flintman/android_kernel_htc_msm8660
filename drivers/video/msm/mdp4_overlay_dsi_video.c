@@ -51,6 +51,16 @@ static struct mdp4_overlay_pipe *dsi_pipe;
 static bool map_wb_address;
 unsigned char *blank_wb_buf;
 
+#define MAX_CONTROLLER	1
+
+void mdp4_dsi_video_base_swap(int cndx, struct mdp4_overlay_pipe *pipe)
+{
+	if (cndx >= MAX_CONTROLLER) {
+		pr_err("%s: out or range: cndx=%d\n", __func__, cndx);
+		return;
+	}
+}
+
 int mdp4_dsi_video_on(struct platform_device *pdev)
 {
 	int dsi_width;

@@ -47,7 +47,7 @@ uint32 mdp4_extn_disp;
 static struct clk *mdp_clk;
 static struct clk *mdp_pclk;
 struct regulator *footswitch;
-
+int mdp_rev;
 struct completion mdp_ppp_comp;
 struct semaphore mdp_ppp_mutex;
 struct semaphore mdp_pipe_ctrl_mutex;
@@ -592,7 +592,37 @@ void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd)
 
 static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
 static int pdev_list_cnt;
+#ifdef CONFIG_FB_MSM_NO_MDP_PIPE_CTRL
+/*
+ * mdp_clk_ctrl: called from thread context
+ */
+void mdp_clk_ctrl(int on)
+{
+	static int mdp_clk_cnt;
 
+	mutex_lock(&mdp_suspend_mutex);
+	if (on) {
+		if (mdp_clk_cnt == 0)
+			mdp_clk_prepare_enable();
+		mdp_clk_cnt++;
+	} else {
+		if (mdp_clk_cnt) {
+			mdp_clk_cnt--;
+			if (mdp_clk_cnt == 0)
+				mdp_clk_disable_unprepare();
+		} else
+			pr_err("%s: %d: mdp clk off is invalid\n",
+			       __func__, __LINE__);
+	}
+	pr_debug("%s: on=%d cnt=%d\n", __func__, on, mdp_clk_cnt);
+	mutex_unlock(&mdp_suspend_mutex);
+}
+#else
+void mdp_clk_ctrl(int on)
+{
+	/* do nothing */
+}
+#endif
 static void mdp_pipe_ctrl_workqueue_handler(struct work_struct *work)
 {
 	mdp_pipe_ctrl(MDP_MASTER_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);

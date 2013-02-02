@@ -46,6 +46,7 @@
 struct mdp4_overlay_ctrl {
 	struct mdp4_overlay_pipe plist[MDP4_MAX_OVERLAY_PIPE];
 	struct mdp4_overlay_pipe *stage[MDP4_MAX_MIXER][MDP4_MAX_STAGE];
+	struct mdp4_overlay_pipe *baselayer[MDP4_MIXER_MAX];
 } mdp4_overlay_db;
 
 static struct mdp4_overlay_ctrl *ctrl = &mdp4_overlay_db;
