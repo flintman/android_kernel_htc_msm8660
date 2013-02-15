@@ -2644,11 +2644,6 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 		return -ENODEV;
 	}
 
-	if (pipe->pipe_type == OVERLAY_TYPE_BF) {
-		mdp4_overlay_borderfill_stage_up(pipe);
-		return 0;
-	}
-
 	if (pipe->pipe_type == OVERLAY_TYPE_VIDEO && atomic_read(&ov_unset))
 		return 0;
 

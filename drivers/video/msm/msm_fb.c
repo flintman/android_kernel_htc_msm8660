@@ -2964,6 +2964,7 @@ static int msmfb_overlay_play_wait(struct fb_info *info, unsigned long *argp)
 	return ret;
 }
 
+//Flintman this is causing kernel to shutdown
 static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 {
 	int	ret;
@@ -3049,11 +3050,6 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
        mutex_unlock(&msm_fb_notify_update_sem);
 #endif
 
-#endif
-
-#ifdef CONFIG_ANDROID_PMEM
-	if (p_src_file)
-		put_pmem_file(p_src_file);
 #endif
 
 	return ret;
@@ -3254,7 +3250,7 @@ static int mdss_fb_display_commit(struct fb_info *info,
 		pr_err("%s:copy_from_user failed", __func__);
 		return ret;
 	}
-	//ret = mdss_fb_pan_display_ex(info, &disp_commit);
+	//ret = mdss_fb_pan_display_ex(info, &disp_commit);FLINTMAN
 	return ret;
 }
 
