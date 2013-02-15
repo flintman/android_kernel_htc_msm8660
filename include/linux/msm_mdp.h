@@ -272,6 +272,7 @@ struct msmfb_overlay_data {
 	struct msmfb_data plane1_data;
 	struct msmfb_data plane2_data;
 #endif
+	 struct msmfb_data dst_data;
 };
 
 struct msmfb_img {

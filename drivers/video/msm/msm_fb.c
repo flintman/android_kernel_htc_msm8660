@@ -42,6 +42,7 @@
 #include <linux/leds.h>
 #include <linux/pm_runtime.h>
 #include <linux/timer.h>
+#include <linux/ion.h> //FLINTMAN HAD TO ADD
 
 #define MSM_FB_C
 #include "msm_fb.h"
@@ -53,6 +54,8 @@
 #include "mach/msm_panel.h"
 
 #define NO_BLT_OFFSET
+
+static struct ion_client *iclient;
 
 #ifdef CONFIG_FB_MSM_LOGO
 #define INIT_IMAGE_FILE "/initlogo.rle"
@@ -504,6 +507,14 @@ static int msm_fb_probe(struct platform_device *pdev)
 		}
 		MSM_FB_INFO("msm_fb_probe:  phy_Addr = 0x%x virt = 0x%x\n",
 			     (int)fbram_phys, (int)fbram);
+
+		//FLINTMAN Seems to be ok.
+		iclient = msm_ion_client_create(-1, pdev->name);
+		if (IS_ERR_OR_NULL(iclient)) {
+			pr_err("msm_ion_client_create() return"
+				" error, val %p\n", iclient);
+			iclient = NULL;
+		}
 
 		msm_fb_resource_initialized = 1;
 #ifdef CONFIG_FB_MSM_OVERLAY
@@ -3232,12 +3243,28 @@ static int msmfb_notify_update(struct fb_info *info, unsigned long *argp)
 }
 #endif
 
+static int mdss_fb_display_commit(struct fb_info *info,
+						unsigned long *argp)
+{
+	int ret;
+	struct mdp_display_commit disp_commit;
+	ret = copy_from_user(&disp_commit, argp,
+			sizeof(disp_commit));
+	if (ret) {
+		pr_err("%s:copy_from_user failed", __func__);
+		return ret;
+	}
+	//ret = mdss_fb_pan_display_ex(info, &disp_commit);
+	return ret;
+}
+
 static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	void __user *argp = (void __user *)arg;
 	struct fb_cursor cursor;
+	struct mdp_buf_sync buf_sync;
 #if defined (CONFIG_FB_MSM_MDP_ABL)
 	struct fb_cmap cmap;
 	struct mdp_histogram hist;
@@ -3492,6 +3519,21 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		ret = -EINVAL;
 #endif
 		break;
+		//FLINTMAN
+		case MSMFB_BUFFER_SYNC:
+			ret = copy_from_user(&buf_sync, argp, sizeof(buf_sync));
+			if (ret)
+				return ret;
+
+			//ret = mdss_fb_handle_buf_sync_ioctl(mfd, &buf_sync);
+
+			//if (!ret)
+			//	ret = copy_to_user(argp, &buf_sync, sizeof(buf_sync));
+			break;
+			//FLINTMAN
+		case MSMFB_DISPLAY_COMMIT:
+			ret = mdss_fb_display_commit(info, argp);
+			break;
 
 	default:
 		MSM_FB_INFO("MDP: unknown ioctl (cmd=%x) received!\n", cmd);
@@ -3576,6 +3618,7 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 	mfd->fb_page = fb_num;
 	mfd->index = fbi_list_index;
 	mfd->mdp_fb_page_protection = MDP_FB_PAGE_PROTECTION_WRITECOMBINE;
+	//mfd->iclient = iclient; FLINTMAN what is this doing?
 
 	/* link to the latest pdev */
 	mfd->pdev = this_dev;

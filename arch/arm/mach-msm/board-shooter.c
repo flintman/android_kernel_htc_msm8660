@@ -2116,19 +2116,13 @@ static struct platform_device msm_batt_device = {
 #define MSM_ION_HOLE_SIZE	0
 #endif
 
-#define MSM_ION_AUDIO_SIZE	MSM_PMEM_AUDIO_SIZE
 #define MSM_SMI_BASE          0x38000000
 #define MSM_MM_FW_BASE		MSM_SMI_BASE
 #define MSM_MM_FW_SIZE		(0x200000 - MSM_ION_HOLE_SIZE) /*(2MB-128KB)*/
 #define MSM_ION_CAMERA_SIZE     MSM_PMEM_ADSP_SIZE
 #define MSM_ION_QSECOM_SIZE	0x600000 /* (6MB) */
-
-#ifdef CONFIG_TZCOM
-#define MSM_ION_QSECOM_SIZE   MSM_PMEM_KERNEL_EBI1_SIZE
-#define MSM_ION_HEAP_NUM      9
-#else
-#define MSM_ION_HEAP_NUM      8
-#endif
+#define MSM_ION_HEAP_NUM	8
+#define MSM_HDMI_PRIM_ION_SF_SIZE MSM_HDMI_PRIM_PMEM_SF_SIZE
 
 #define MSM_ION_MM_FW_BASE    0x38000000
 #define MSM_ION_MM_BASE	      (MSM_ION_MM_FW_BASE + MSM_ION_MM_FW_SIZE)
@@ -6412,17 +6406,6 @@ static struct ion_platform_data ion_pdata = {
 			.memory_type = ION_SMI_TYPE,
 			.extra_data = (void *) &cp_mfc_ion_pdata,
 		},
-		/* EBI part: QSECOM needs to be the 1st one to avoid wasting memory when it's disabled. */
-#ifdef CONFIG_TZCOM
-		{
-			.id	= ION_QSECOM_HEAP_ID,
-			.type	= ION_HEAP_TYPE_CARVEOUT,
-			.name	= ION_QSECOM_HEAP_NAME,
-			.size	= MSM_ION_QSECOM_SIZE,
-			.memory_type = ION_EBI_TYPE,
-			.extra_data = (void *) &co_ion_pdata,
-		},
-#endif
 		{
 			.id	= ION_CP_ROTATOR_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
@@ -6441,15 +6424,15 @@ static struct ion_platform_data ion_pdata = {
 			.memory_type = ION_EBI_TYPE,
 			.extra_data = &co_ion_pdata,
 		},
-                {
-                        .id     = ION_SF_HEAP_ID,
-                        .type   = ION_HEAP_TYPE_CARVEOUT,
-                        .name   = ION_SF_HEAP_NAME,
-                        .base   = MSM_ION_SF_BASE,
-                        .size   = MSM_ION_SF_SIZE,
-                        .memory_type = ION_EBI_TYPE,
-                        .extra_data = (void *) &co_ion_pdata,
-                },
+        {
+            .id     = ION_SF_HEAP_ID,
+            .type   = ION_HEAP_TYPE_CARVEOUT,
+            .name   = ION_SF_HEAP_NAME,
+            .base   = MSM_ION_SF_BASE,
+            .size   = MSM_ION_SF_SIZE,
+            .memory_type = ION_EBI_TYPE,
+            .extra_data = (void *) &co_ion_pdata,
+        },
 		{
 			.id	= ION_CP_WB_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CP,

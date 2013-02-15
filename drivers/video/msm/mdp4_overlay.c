@@ -1603,10 +1603,10 @@ struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(
 	struct mdp4_overlay_pipe *pipe, *opipe;
 	struct mdp4_pipe_desc  *pd;
 
-	if (ptype == OVERLAY_TYPE_BF) {
-		if (!mdp4_overlay_borderfill_supported())
-			return NULL;
-	}
+	//if (ptype == OVERLAY_TYPE_BF) {
+	//	if (!mdp4_overlay_borderfill_supported())
+		//	return NULL; FLINTMAN
+	//}
 
 	found = 0;
 	pipe = &ctrl->plist[0];
