@@ -3327,7 +3327,6 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_blit(info, argp);
 		up(&msm_fb_ioctl_ppp_sem);
-
 		break;
 
 	/* Ioctl for setting ccs matrix from user space */
