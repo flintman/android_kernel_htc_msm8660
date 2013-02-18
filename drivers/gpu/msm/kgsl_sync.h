@@ -33,7 +33,7 @@ void kgsl_sync_pt_destroy(struct sync_pt *pt);
 int kgsl_add_fence_event(struct kgsl_device *device,
 	u32 context_id, u32 timestamp, void __user *data, int len,
 	struct kgsl_device_private *owner);
-int kgsl_sync_timeline_create(struct kgsl_context *context);
+//FLINTMAN int kgsl_sync_timeline_create(struct kgsl_context *context);
 void kgsl_sync_timeline_signal(struct sync_timeline *timeline,
 	unsigned int timestamp);
 void kgsl_sync_timeline_destroy(struct kgsl_context *context);
@@ -55,11 +55,11 @@ static inline int kgsl_add_fence_event(struct kgsl_device *device,
 	return -EINVAL;
 }
 
-static int kgsl_sync_timeline_create(struct kgsl_context *context)
-{
-	context->timeline = NULL;
-	return 0;
-}
+//FLINTMANstatic int kgsl_sync_timeline_create(struct kgsl_context *context)
+//{
+//	context->timeline = NULL;
+//	return 0;
+//}
 
 static inline void
 kgsl_sync_timeline_signal(struct sync_timeline *timeline,

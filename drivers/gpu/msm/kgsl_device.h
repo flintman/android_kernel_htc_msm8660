@@ -199,6 +199,7 @@ struct kgsl_device {
 };
 
 struct kgsl_context {
+	struct kref refcount;
 	uint32_t id;
 
 	/* Pointer to the owning device instance */
@@ -211,6 +212,7 @@ struct kgsl_context {
 	 * context was responsible for causing it
 	 */
 	unsigned int reset_status;
+	struct sync_timeline *timeline;
 };
 
 struct kgsl_process_private {
@@ -348,5 +350,34 @@ const char *kgsl_pwrstate_to_str(unsigned int state);
 int kgsl_device_snapshot_init(struct kgsl_device *device);
 int kgsl_device_snapshot(struct kgsl_device *device, int hang);
 void kgsl_device_snapshot_close(struct kgsl_device *device);
+
+/**
+ * kgsl_context_get - Get context reference count
+ * @context
+ *
+ * Asynchronous code that holds a pointer to a context
+ * must hold a reference count on it. The kgsl device
+ * mutex must be held while the context reference count
+ * is changed.
+ */
+static inline void
+kgsl_context_get(struct kgsl_context *context)
+{
+	kref_get(&context->refcount);
+}
+
+void kgsl_context_destroy(struct kref *kref);
+
+/**
+ * kgsl_context_put - Release context reference count
+ * @context
+ *
+ */
+static inline void
+kgsl_context_put(struct kgsl_context *context)
+{
+	kref_put(&context->refcount, kgsl_context_destroy);
+}
+
 
 #endif  /* __KGSL_DEVICE_H */

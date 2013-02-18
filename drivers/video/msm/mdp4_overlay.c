@@ -1322,7 +1322,7 @@ void mdp4_mixer_stage_down(struct mdp4_overlay_pipe *pipe)
  */
 void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 {
-	struct mdp4_overlay_pipe *bspipe;
+	//struct mdp4_overlay_pipe *bspipe;
 	int ptype, pnum, pndx, mixer;
 	int format, alpha_enable, alpha;
 
@@ -1334,16 +1334,16 @@ void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 	if (ctrl->baselayer[mixer])
 		return;
 
-	bspipe = ctrl->stage[mixer][MDP4_MIXER_STAGE_BASE];
+	//bspipe = ctrl->stage[mixer][MDP4_MIXER_STAGE_BASE];
 
 	/*
 	 * bspipe is clone here
 	 * get real pipe
 	 */
-	bspipe = mdp4_overlay_ndx2pipe(bspipe->pipe_ndx);
+	//bspipe = mdp4_overlay_ndx2pipe(bspipe->pipe_ndx);
 
 	/* save original base layer */
-	ctrl->baselayer[mixer] = bspipe;
+	//ctrl->baselayer[mixer] = bspipe;
 
 	pipe->alpha = 0;	/* make sure bf pipe has alpha 0 */
 	ptype = pipe->pipe_type;
@@ -1352,7 +1352,7 @@ void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 	format = pipe->src_format;
 	alpha_enable = pipe->alpha_enable;
 	alpha = pipe->alpha;
-	*pipe = *bspipe;	/* keep base layer configuration */
+	//*pipe = *bspipe;	/* keep base layer configuration */
 	pipe->pipe_type = ptype;
 	pipe->pipe_num = pnum;
 	pipe->pipe_ndx = pndx;
@@ -1361,7 +1361,7 @@ void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 	pipe->alpha = alpha;
 
 	/* free original base layer pipe to be sued as normal pipe */
-	bspipe->pipe_used = 0;
+	//bspipe->pipe_used = 0;
 
 	if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
 		mdp4_dsi_video_base_swap(0, pipe);
@@ -1372,7 +1372,7 @@ void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 	else if (ctrl->panel_mode & MDP4_PANEL_DTV)
 		mdp4_dtv_base_swap(0, pipe);
 
-	mdp4_overlay_reg_flush(bspipe, 1);
+	//mdp4_overlay_reg_flush(bspipe, 1);
 	/* borderfill pipe as base layer */
 	mdp4_mixer_stage_up(pipe);
 }
@@ -2642,6 +2642,11 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 	if (pipe == NULL) {
 		PR_DISP_ERR("%s: req_id=%d Error\n", __func__, req->id);
 		return -ENODEV;
+	}
+
+	if (pipe->pipe_type == OVERLAY_TYPE_BF) {
+		mdp4_overlay_borderfill_stage_up(pipe);
+		return 0;
 	}
 
 	if (pipe->pipe_type == OVERLAY_TYPE_VIDEO && atomic_read(&ov_unset))

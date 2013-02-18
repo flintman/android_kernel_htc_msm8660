@@ -113,16 +113,20 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 	struct sync_pt *pt;
 	struct sync_fence *fence = NULL;
 	int ret = -EINVAL;
+	KGSL_DRV_ERR(device, "FLINTMAN inside here \n");
 
 	if (len != sizeof(priv))
+		KGSL_DRV_ERR(device, "FLINTMAN len is null\n");
 		return -EINVAL;
 
 	context = kgsl_find_context(owner, context_id);
 	if (context == NULL)
+		KGSL_DRV_ERR(device, "FLINTMAN context is null\n");
 		return -EINVAL;
 
 	event = kzalloc(sizeof(*event), GFP_KERNEL);
 	if (event == NULL)
+		KGSL_DRV_ERR(device, "FLINTMAN event is null\n");
 		return -ENOMEM;
 	event->context = context;
 	kgsl_context_get(context);
@@ -152,6 +156,7 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 	sync_fence_install(fence, priv.fence_fd);
 
 	if (copy_to_user(data, &priv, sizeof(priv))) {
+		KGSL_DRV_ERR(device, "FLINTMAN copy to user failed\n");
 		ret = -EFAULT;
 		goto fail_copy_fd;
 	}
@@ -164,6 +169,7 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 	return 0;
 
 fail_event:
+KGSL_DRV_ERR(device, "FLINTMAN fail_event\n");
 fail_copy_fd:
 	/* clean up sync_fence_install */
 	sync_fence_put(fence);
@@ -184,7 +190,7 @@ static const struct sync_timeline_ops kgsl_sync_timeline_ops = {
 	.compare = kgsl_sync_pt_compare,
 };
 
-int kgsl_sync_timeline_create(struct kgsl_context *context)
+/*int kgsl_sync_timeline_create(struct kgsl_context *context)
 {
 	struct kgsl_sync_timeline *ktimeline;
 
@@ -197,7 +203,7 @@ int kgsl_sync_timeline_create(struct kgsl_context *context)
 	ktimeline->last_timestamp = 0;
 
 	return 0;
-}
+}*/
 
 void kgsl_sync_timeline_signal(struct sync_timeline *timeline,
 	unsigned int timestamp)
